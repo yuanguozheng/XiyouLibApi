@@ -137,8 +137,6 @@ namespace XiyouLibApi.Funtions
             {
                 ProcParams();  //When use POST, proccess params to URLEncoded string and write to stream.
             }
-
-            DoRequest();  //Receive response.
         }
 
         /// <summary>
@@ -213,7 +211,59 @@ namespace XiyouLibApi.Funtions
         /// <summary>
         /// Receive response from remote server.
         /// </summary>
-        private async void DoRequest()
+        public BasedReturned DoRequest()
+        {
+            HttpWebResponse res;  //Http response.
+
+            try
+            {
+                res = (HttpWebResponse)req.GetResponse();  //Use synchronous way to get response.
+            }
+            catch
+            {
+                return new BasedReturned
+                {
+                    Result = false,
+                    Detail = "GET_RESPONSE_FAILED"
+                };
+            }
+
+            object ReturnContent;
+
+            try
+            {
+                using (Stream stream = res.GetResponseStream())  //Return string or bytes.
+                {
+                    if (ReturnBytes)
+                    {
+                        ReturnContent = GetBytes(stream);
+                    }
+                    else
+                    {
+                        ReturnContent = GetString(stream);
+                    }
+                }
+            }
+            catch
+            {
+                return new BasedReturned
+                {
+                    Result = false,
+                    Detail = "RESPONSE_STREAM_ERROR"
+                };
+            }
+
+            return new BasedReturned
+            {
+                Result = true,
+                Detail = ReturnContent
+            };  //Successfully Return.
+        }
+
+        /// <summary>
+        /// Receive response from remote server use asynchronous way.
+        /// </summary>
+        public async void DoRequestAsync()
         {
             HttpWebResponse res;  //Http response.
 
@@ -246,11 +296,11 @@ namespace XiyouLibApi.Funtions
                 {
                     if (ReturnBytes)
                     {
-                        ReturnContent = await GetBytes(stream);
+                        ReturnContent = await GetBytesAsync(stream);
                     }
                     else
                     {
-                        ReturnContent = await GetString(stream);
+                        ReturnContent = await GetStringAsync(stream);
                     }
                 }
             }
@@ -272,11 +322,11 @@ namespace XiyouLibApi.Funtions
         }
 
         /// <summary>
-        /// Get string from response stream.
+        /// Get string from response stream by asynchronous way.
         /// </summary>
         /// <param name="stream">Response Stream.</param>
         /// <returns>String of response content.</returns>
-        private async Task<string> GetString(Stream stream)
+        private async Task<string> GetStringAsync(Stream stream)
         {
             string ResponseContent = "";
             StreamReader reader = new StreamReader(stream, Encoding.GetEncoding(ResponseCodeType)); //Encoding.
@@ -294,11 +344,62 @@ namespace XiyouLibApi.Funtions
         }
 
         /// <summary>
+        /// Get string from response stream.
+        /// </summary>
+        /// <param name="stream">Response Stream.</param>
+        /// <returns>String of response content.</returns>
+        private string GetString(Stream stream)
+        {
+            string ResponseContent = "";
+            StreamReader reader = new StreamReader(stream, Encoding.GetEncoding(ResponseCodeType)); //Encoding.
+            if (IsAsync)
+            {
+                ResponseContent = reader.ReadToEnd();
+            }
+            else
+            {
+                ResponseContent = reader.ReadToEnd();
+            }
+            reader.Close();
+            stream.Close();
+            return ResponseContent;
+        }
+
+        /// <summary>
         /// Get bytes from response stream.
         /// </summary>
         /// <param name="stream">Response stream.</param>
         /// <returns>Bytes of response content.</returns>
-        private async Task<byte[]> GetBytes(Stream stream)
+        private byte[] GetBytes(Stream stream)
+        {
+            byte[] ResponseContent = new byte[stream.Length];
+            while (stream.CanRead)
+            {
+                byte[] buffer = new byte[256];
+                if (IsAsync)
+                {
+                    stream.Read(buffer, 0, 256);  //Read to buffer use asynchronous way.
+                }
+                else
+                {
+                    stream.Read(buffer, 0, 256);  //Read to buffer use synchronous way.
+                }
+                int n = ResponseContent.Length;
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    ResponseContent[n + i] = buffer[i];  //Add.
+                }
+            }
+            stream.Close();
+            return ResponseContent;
+        }
+
+        /// <summary>
+        /// Get bytes from response stream.
+        /// </summary>
+        /// <param name="stream">Response stream.</param>
+        /// <returns>Bytes of response content.</returns>
+        private async Task<byte[]> GetBytesAsync(Stream stream)
         {
             byte[] ResponseContent = new byte[stream.Length];
             while (stream.CanRead)
